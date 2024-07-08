@@ -8,18 +8,19 @@ class HTMLElement
     if name
       @tag_name = name
     elsif !@tag_name
-      @tag_name = self.name.gsub(/([A-Z]+)/){"-#{$1}"}.sub(/\A-/, "").downcase
+      @tag_name = self.name.gsub(/([A-Z]+)/){"-#{$1}"}.gsub(/::/, '-').sub(/\A-/, "").downcase
     end
     @tag_name
   end
 
   def self.inherited(subclass)
     super
+    class_name = subclass.name.gsub(/::/, '__')
     js = <<~EOS
-      #{subclass.name} = class extends #{subclass.superclass.name} {
+      #{class_name} = class extends #{subclass.superclass.name.gsub(/::/, '__')} {
         constructor() {
           super()
-          if (this.constructor === #{subclass.name}) {
+          if (this.constructor === #{class_name}) {
             _ruby_htmlelement_id++
             _ruby_htmlelement_this[_ruby_htmlelement_id] = this
             this._ruby_htmlelement_id = _ruby_htmlelement_id
@@ -27,7 +28,7 @@ class HTMLElement
           }
         }
       }
-      customElements.define('#{subclass.tag_name}', #{subclass.name});
+      customElements.define('#{subclass.tag_name}', #{class_name});
     EOS
     JS.eval(js)
   rescue JS::Error => e
