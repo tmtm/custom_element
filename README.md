@@ -11,8 +11,8 @@
   <script type="text/ruby">
     class HogeHoge < HTMLElement
       def initialize
-        self[:textContent] = 'hoge hoge'
-        self[:style][:color] = 'red'
+        self.text_content = 'hoge hoge'
+        self.style.color = 'red'
       end
     end
   </script>
