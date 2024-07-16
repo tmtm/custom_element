@@ -7,7 +7,7 @@
 <html>
   <script src="https://cdn.jsdelivr.net/npm/@ruby/3.3-wasm-wasi@2.6.2/dist/browser.script.iife.js">
   </script>
-  <script src="https://cdn.jsdelivr.net/gh/tmtm/htmlelement@0.0.1/lib/htmlelement.rb"></script>
+  <script type="text/ruby" src="https://cdn.jsdelivr.net/gh/tmtm/htmlelement@0.0.2/lib/htmlelement.rb"></script>
   <script type="text/ruby">
     class HogeHoge < HTMLElement
       def initialize
