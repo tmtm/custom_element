@@ -1,63 +1,70 @@
+# ---- JSrb
 require 'js'
 
-# ---- JSrb
-# https://mysql-params.tmtms.net/lib/jsrb.rb
-JS::Object.undef_method(:then)  # JS の then を呼ぶために Ruby の then を無効化
-Document = JS.global[:document]
-
 # JS を Ruby ぽく扱えるようにする
-module JSrb
+class JSrb
+  # @param obj [JS::Object]
+  def initialize(obj)
+    @obj = obj
+  end
+
   # hoge_fuga を hogeFuga に変換して JavaScript を呼び出し、
   # 値を JS::Object から Ruby に変換して返す
   def method_missing(sym, *args, &block)
-    if __jsprop__(sym) == JS::Undefined
-      if sym.end_with? '='
-        equal = true
-        sym = sym.to_s.chop.intern
-      end
-      if __jsprop__(sym) == JS::Undefined && sym =~ /_[a-z]/
-        sym2 = sym.to_s.gsub(/_([a-z])/){$1.upcase}.intern
-        if __jsprop__(sym2) == JS::Undefined
-          raise NoMethodError, "undefined method `#{sym}' for #{self.inspect}"
-        end
-        sym = sym2
-      end
+    jssym = sym.to_s.gsub(/_([a-z])/){$1.upcase}.intern
+    if @obj[jssym] == JS::Undefined
+      super unless jssym.end_with? '='
+      equal = true
+      jssym = jssym.to_s.chop.intern
     end
-    v = __jsprop__(sym)
+    v = @obj[jssym]
     if v.typeof == 'function'
-      __convert_value__(self.call(sym, *args, &block))
+      __convert_value__(@obj.call(jssym, *args, &block))
     elsif !equal && args.empty?
       __convert_value__(v)
     elsif equal && args.length == 1
-      self[sym] = args.first
+      @obj[jssym] = args.first
     else
-      raise NoMethodError, "undefined method `#{sym}' for #{self.inspect}"
+      super
     end
   end
 
   def respond_to_missing?(sym, include_private)
     return true if super
-    sym2 = sym.to_s.gsub(/_([a-z])/){$1.upcase}
-    __jsprop__(sym) != JS::Undefined || __jsprop__(sym2) != JS::Undefined
+    jssym = sym.to_s.sub(/=$/, '').gsub(/_([a-z])/){$1.upcase}.intern
+    @obj[sym] != JS::Undefined || @obj[jssym] != JS::Undefined
+  end
+
+  def to_s
+    @obj.to_s
+  end
+
+  def to_i
+    @obj.to_i
+  end
+
+  def to_h
+    x = JSrb.new(JS.global[:Object].call(:entries, @obj))
+    x.length.times.map.to_h{|i| [x[i][0].intern, x[i][1]]}
+  end
+
+  def inspect
+    "#<JSrb: #{@obj.inspect}>"
   end
 
   # @param sym [Symbol]
   # @return [Object]
   def [](sym)
-    __convert_value__(super)
+    __convert_value__(@obj[sym])
   end
 
   private
 
-  # @param sym [Symbol]
-  # @return [JS::Object]
-  def __jsprop__(sym)
-    self.method(:[]).super_method.call(sym.intern)
-  end
-
   # @param v [JS::Object]
   # @return [Object]
   def __convert_value__(v)
+    return nil if v == JS::Null || v == JS::Undefined
+
     case v.typeof
     when 'number'
       v.to_s =~ /\./ ? v.to_f : v.to_i
@@ -68,20 +75,30 @@ module JSrb
     when 'boolean'
       v.to_s == 'true'
     else
-      if v.to_s =~ /\A\[object .*(List|Collection)\]\z/
-        v.length.times.map{|i| v[i]}
-      elsif v == JS::Null || v == JS::Undefined
-        nil
-      else
+      if JS.global[:Array].call(:isArray, v).to_s == 'true'
+        v[:length].to_i.times.map{|i| __convert_value__(v[i])}
+      elsif v[:length].typeof == 'number' && v[:item].typeof == 'function'
+        v = JSrb.new(v)
+        v.extend JSrb::Enumerable
         v
+      else
+        JSrb.new(v)
+      end
+    end
+  end
+
+  module Enumerable
+    include ::Enumerable
+
+    def each
+      self.length.times do |i|
+        yield self.item(i)
       end
     end
   end
 end
 
-class JS::Object
-  prepend JSrb
-end
+$document = JSrb.new(JS.global[:document])
 # ---- JSrb
 
 # base class for creating custom elements
@@ -140,7 +157,7 @@ class HTMLElement
 
   def self.construct(id)
     obj = self.allocate
-    obj.instance_variable_set(:@this, JS.global._ruby_htmlelement_this[id])
+    obj.instance_variable_set(:@this, JSrb.new(JS.global[:_ruby_htmlelement_this][id]))
     object[id] = obj
     obj.__send__ :initialize
   end
@@ -158,7 +175,7 @@ class HTMLElement
   end
 
   def self.attribute_changed_callback(id)
-    a = JS.global._attribute_changed[id]
+    a = JS.global[:_attribute_changed][id]
     name, old_value, new_value = a.name, a.oldValue, a.newValue
     object[id].attribute_changed_callback(name, old_value, new_value)
   end
