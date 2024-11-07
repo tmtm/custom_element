@@ -13,6 +13,15 @@ class CustomElement
 
   def self.inherited(subclass)
     super
+    subclass.define_singleton_method(:singleton_method_added){|n| __setup__ if n == :observed_attributes}
+    subclass.define_singleton_method(:method_added){|n| __setup__ if n == :initialize}
+  end
+
+  def self.__setup__
+    return if @setup_completed
+    @setup_completed = true
+
+    subclass = self
     superclass = subclass.superclass == CustomElement ? 'HTMLElement' : subclass.superclass.name.gsub(/::/, '__')
     class_name = subclass.name.gsub(/::/, '__')
     js = <<~JS
@@ -20,7 +29,7 @@ class CustomElement
         constructor() {
           super()
           if (this.constructor === #{class_name}) {
-          this._ruby_custom_element_id = ++_ruby_custom_element_id
+            this._ruby_custom_element_id = ++_ruby_custom_element_id
             _ruby_custom_element_this[this._ruby_custom_element_id] = this
             setTimeout(()=>{
               this._ruby_object_id = rubyVM.eval('#{subclass.name}.construct('+this._ruby_custom_element_id+').__id__').toJS()
@@ -29,7 +38,7 @@ class CustomElement
           }
         }
         static get observedAttributes() {
-          return JSON.parse(rubyVM.eval('#{class_name}.observed_attributes').toString())
+          return rubyVM.eval('#{subclass.name}.observed_attributes').toJS()
         }
         connectedCallback() {
           setTimeout(()=>{rubyVM.eval('ObjectSpace._id2ref('+this._ruby_object_id+').connected_callback')}, 0)
@@ -41,10 +50,13 @@ class CustomElement
           setTimeout(()=>{rubyVM.eval('ObjectSpace._id2ref('+this._ruby_object_id+').adopted_callback')}, 0)
         }
         attributeChangedCallback(name, oldValue, newValue) {
-          _attribute_changed[this._ruby_objec_id] = {name, oldValue, newValue}
-          setTimeout(()=>{
-            rubyVM.eval('ObjectSpace._id2ref('+this._ruby_object_id+').attribute_changed_callback(*JSrb.global[:_attribute_changed][self.__id__].values_at(:name, :oldValue :newValue))')
-          }, 0)
+          var intervalID = setInterval(()=>{
+            if (this._ruby_object_id) {
+              _attribute_changed[this._ruby_object_id] = {name, oldValue, newValue}
+              setTimeout(()=>{rubyVM.eval('x=ObjectSpace._id2ref('+this._ruby_object_id+');x.attribute_changed_callback(*JSrb.global[:_attribute_changed].to_h[x.__id__.to_s].to_h.values_at("name", "oldValue", "newValue"))')}, 0)
+              clearInterval(intervalID)
+            }
+          }, 100)
         }
       }
       customElements.define('#{subclass.tag_name}', #{class_name});
@@ -67,7 +79,7 @@ class CustomElement
     obj
   end
 
-  def self.observed_attributes()
+  def self.observed_attributes
     []
   end
 
