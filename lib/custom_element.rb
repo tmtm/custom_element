@@ -2,19 +2,21 @@
 class CustomElement
   JS.eval("_ruby_custom_element_id = 0; _ruby_custom_element_this = {}; _attribute_changed = {}")
 
-  def self.tag_name(name=nil)
-    if name
-      @tag_name = name
-    elsif !@tag_name
-      @tag_name = self.name.gsub(/([A-Z]+)/){"-#{$1}"}.gsub(/::/, '-').sub(/\A-/, "").downcase
-    end
-    @tag_name
+  def self.define(tag_name, element_class)
+    JS.eval("customElements.define('#{tag_name}', #{element_class.name})")
+  end
+
+  def self.observed_attributes=(attrs)
+    @observed_attributes = attrs
+  end
+
+  def self.observed_attributes
+    @observed_attributes ||= []
   end
 
   def self.inherited(subclass)
     super
-    subclass.define_singleton_method(:singleton_method_added){|n| __setup__ if n == :observed_attributes}
-    subclass.define_singleton_method(:method_added){|n| __setup__ if n == :initialize}
+    subclass.define_singleton_method(:method_added){|_| __setup__}
   end
 
   def self.__setup__
@@ -59,7 +61,6 @@ class CustomElement
           }, 100)
         }
       }
-      customElements.define('#{subclass.tag_name}', #{class_name});
     JS
     JS.eval(js)
   rescue JS::Error => e
@@ -77,10 +78,6 @@ class CustomElement
     object[id] = obj
     obj.__send__ :initialize
     obj
-  end
-
-  def self.observed_attributes
-    []
   end
 
   def connected_callback
