@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+  <script src="https://cdn.jsdelivr.net/npm/@ruby/3.3-wasm-wasi@2.6.2/dist/browser.script.iife.js"></script>
+  <script type="text/ruby" src="https://cdn.jsdelivr.net/gh/tmtm/jsrb@v0.1.0/jsrb.rb"></script>
+  <script type="text/ruby" src="../lib/custom_element.rb"></script>
+  <script type="text/ruby" src="split_panes2.rb"></script>
+  <style>
+   split-panes {
+       display: flex;
+       overflow: scroll;
+   }
+   split-pane {
+       display: inline-block;
+       overflow: scroll;
+   }
+   split-splitter {
+       display: flex;
+       align-items: center;
+       width: 6px;
+       cursor: col-resize;
+       background-color: white;
+       div.knob {
+           background-color: #ddd;
+           width: 4px;
+           height: 50px;
+           margin: 0 auto;
+           user-select: none;
+       }
+   }
+  </style>
+
+  <body>
+    <split-panes id="a" style="height:800px;width:600px" vertical>
+      <split-pane id="a1" style="background-color:red">
+        <split-panes id="b" style="height:400px;min-width:400px">
+          <split-pane id="b1" style="background-color:blue">
+            0<br>1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9
+          </split-pane>
+          <split-pane id="b2" style="background-color:yellow">
+            0<br>1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9
+          </split-pane>
+          <split-pane id="b3" style="background-color:green">
+            0<br>1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9
+          </split-pane>
+        </split-panes>
+      </split-pane>
+      <split-pane id="a2" style="background-color:blue">
+      </split-pane>
+    </split-panes>
+  </body>
+</html>
