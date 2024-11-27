@@ -6,22 +6,42 @@ class SplitPanes < CustomElement
         overflow: scroll;
     }
     split-pane {
+        position: absolute;
         display: block;
         overflow: scroll;
     }
     split-splitter {
-        display: flex;
+        position: absolute;
+        display: block;
         align-items: center;
-        height: 6px;
         cursor: row-resize;
         background-color: white;
         div.knob {
+            display: inline-block;
+            position: absolute;
+            vertical-align: middle;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            margin: auto;
             background-color: #ddd;
-            width: 50px;
-            height: 4px;
-            margin: 0 auto;
             user-select: none;
         }
+        div.knob-vertical {
+            width: 4px;
+            height: 50px;
+        }
+        div.knob-horizontal {
+            width: 50px;
+            height: 4px;
+        }
+    }
+    split-splitter.vertical {
+        width: 6px
+    }
+    split-splitter.horizontal {
+        height: 6px
     }
   CSS
   JSrb.document.query_selector('head').append(style)
@@ -31,6 +51,7 @@ class SplitPanes < CustomElement
     splitters = []
     (panes.size - 1).times.each do |i|
       splitter = JSrb.document.create_element('split-splitter')
+      splitter.class_name = 'horizontal'
       splitter.add_event_listener('mousedown'){|ev| @splitter = i if ev.buttons == 1}
       splitters.push splitter
       panes[i].after splitter
@@ -43,6 +64,9 @@ class SplitPanes < CustomElement
       pane.style.height = "#{height}px"
     end
     panes.last.style.height = "#{panes_height - (height * (panes.size - 1))}px"
+
+    @panes = panes
+    @splitters = splitters
 
     self.add_event_listener('mouseup'){@splitter = nil}
     self.add_event_listener('mousemove') do |ev|
@@ -64,18 +88,35 @@ class SplitPanes < CustomElement
       end
       panes[i].style.height = "#{h1}px"
       panes[i+1].style.height = "#{h2}px"
+      reset_pane_position(self.client_height)
     end
 
     resize_observer = JSrb.global[:ResizeObserver].new do |entries|
       entries.each do |entry|
         new_height = entry.border_box_size[0].block_size
-        last_pane_height = new_height - splitter_height - panes[0..-2].sum(&:client_height)
-        last_pane_height = last_pane_height.clamp(20..)
-        panes.last.style.height = "#{last_pane_height}px"
+        reset_pane_position(new_height)
       end
       nil
     end
     resize_observer.observe(self.js_object)
+  end
+
+  def reset_pane_position(new_height)
+    top = 0
+    width = self.client_width
+    @panes[0..-2].each_with_index do |pane, i|
+      pane.style.top = "#{top}px"
+      pane.style.width = "#{width}px"
+      top += pane.client_height
+      @splitters[i].style.top = "#{top}px"
+      @splitters[i].style.width = "#{width}px"
+      top += @splitters[i].client_height
+    end
+    @panes.last.style.top = "#{top}px"
+    @panes.last.style.width = "#{width}px"
+    last_pane_height = new_height - top
+    last_pane_height = last_pane_height.clamp(20..)
+    @panes.last.style.height = "#{last_pane_height}px"
   end
 
   def disconnected_callback
@@ -123,7 +164,7 @@ end
 class SplitSplitter < CustomElement
   def connected_callback
     knob = JSrb.document.create_element('div')
-    knob.class_name = 'knob'
+    knob.class_name = 'knob knob-horizontal'
     self.append knob
   end
 
