@@ -4,31 +4,6 @@
   <script type="text/ruby" src="https://cdn.jsdelivr.net/gh/tmtm/jsrb@v0.1.0/jsrb.rb"></script>
   <script type="text/ruby" src="../lib/custom_element.rb"></script>
   <script type="text/ruby" src="split_panes2.rb"></script>
-  <style>
-   split-panes {
-       display: flex;
-       overflow: scroll;
-   }
-   split-pane {
-       display: inline-block;
-       overflow: scroll;
-   }
-   split-splitter {
-       display: flex;
-       align-items: center;
-       width: 6px;
-       cursor: col-resize;
-       background-color: white;
-       div.knob {
-           background-color: #ddd;
-           width: 4px;
-           height: 50px;
-           margin: 0 auto;
-           user-select: none;
-       }
-   }
-  </style>
-
   <body>
     <split-panes id="a" style="height:800px;width:600px" vertical>
       <split-pane id="a1" style="background-color:red">

@@ -1,4 +1,35 @@
 class SplitPanes < CustomElement
+  style = JSrb.document.create_element('style')
+  style.text_content = <<~CSS
+    split-panes {
+        display: block;
+        overflow: scroll;
+    }
+    split-pane {
+        position: absolute;
+        display: block;
+        overflow: scroll;
+    }
+    split-splitter {
+        position: absolute;
+        display: block;
+        align-items: center;
+        width: 6px;
+        cursor: col-resize;
+        background-color: white;
+        div.knob {
+            position: absolute;
+            top: 50%;
+            background-color: #ddd;
+            width: 4px;
+            height: 50px;
+            margin: auto;
+            user-select: none;
+        }
+    }
+  CSS
+  JSrb.document.query_selector('head').append(style)
+
   def connected_callback
     panes = self.query_selector_all(':scope > split-pane').entries
     splitters = []
@@ -16,6 +47,9 @@ class SplitPanes < CustomElement
       pane.style.width = "#{width}px"
     end
     panes.last.style.width = "#{panes_width - (width * (panes.size - 1))}px"
+
+    @panes = panes
+    @splitters = splitters
 
     self.add_event_listener('mouseup'){@splitter = nil}
     self.add_event_listener('mousemove') do |ev|
@@ -37,18 +71,35 @@ class SplitPanes < CustomElement
       end
       panes[i].style.width = "#{h1}px"
       panes[i+1].style.width = "#{h2}px"
+      reset_pane_position(self.client_width)
     end
 
     resize_observer = JSrb.global[:ResizeObserver].new do |entries|
       entries.each do |entry|
         new_width = entry.border_box_size[0].inline_size
-        last_pane_width = new_width - splitter_width - panes[0..-2].sum(&:client_width)
-        last_pane_width = last_pane_width.clamp(20..)
-        panes.last.style.width = "#{last_pane_width}px"
+        reset_pane_position(new_width)
       end
       nil
     end
     resize_observer.observe(self.js_object)
+  end
+
+  def reset_pane_position(new_width)
+    left = 0
+    height = self.client_height
+    @panes[0..-2].each_with_index do |pane, i|
+      pane.style.left = "#{left}px"
+      pane.style.height = "#{height}px"
+      left += pane.client_width
+      @splitters[i].style.left = "#{left}px"
+      @splitters[i].style.height = "#{height}px"
+      left += @splitters[i].client_width
+    end
+    @panes.last.style.left = "#{left}px"
+    @panes.last.style.height = "#{height}px"
+    last_pane_width = new_width - left
+    last_pane_width = last_pane_width.clamp(20..)
+    @panes.last.style.width = "#{last_pane_width}px"
   end
 
   def disconnected_callback
