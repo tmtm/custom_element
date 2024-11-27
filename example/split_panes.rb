@@ -14,7 +14,6 @@ class SplitPanes < CustomElement
         position: absolute;
         display: block;
         align-items: center;
-        cursor: row-resize;
         background-color: white;
         div.knob {
             display: inline-block;
@@ -38,35 +37,49 @@ class SplitPanes < CustomElement
         }
     }
     split-splitter.vertical {
+        cursor: col-resize;
         width: 6px
     }
     split-splitter.horizontal {
+        cursor: row-resize;
         height: 6px
     }
   CSS
   JSrb.document.query_selector('head').append(style)
 
   def connected_callback
+    if self.get_attribute('vertical')
+      @mode = :vertical
+      @dimension = :width
+      @client_dimension = :clientWidth
+    else
+      @mode = :horizontal
+      @dimension = :height
+      @client_dimension = :clientHeight
+    end
+
     panes = self.query_selector_all(':scope > split-pane').entries
     splitters = []
     (panes.size - 1).times.each do |i|
       splitter = JSrb.document.create_element('split-splitter')
-      splitter.class_name = 'horizontal'
+      splitter.class_name = @mode.to_s
       splitter.add_event_listener('mousedown'){|ev| @splitter = i if ev.buttons == 1}
       splitters.push splitter
       panes[i].after splitter
     end
-    splitter_height = splitters.sum(&:client_height)
-    self.style.min_height = "#{(panes.size * 20) + splitter_height}px" unless self.style.min_height
-    panes_height = self.client_height - splitter_height
-    height = panes_height / panes.size
+    splitter_size = splitters.sum(&@client_dimension)
+    self.style[:"min#{@dimension.upcase}"] = "#{(panes.size * 20) + splitter_size}px" unless self.style[:"min#{@dimension.upcase}"]
+    panes_size = self[@client_dimension] - splitter_size
+    size = panes_size / panes.size
     panes[0..-2].each do |pane|
-      pane.style.height = "#{height}px"
+      pane.style[@dimension] = "#{size}px"
     end
-    panes.last.style.height = "#{panes_height - (height * (panes.size - 1))}px"
+    panes.last.style[@dimension] = "#{panes_size - (size * (panes.size - 1))}px"
 
     @panes = panes
     @splitters = splitters
+
+    reset_pane_position(self[@client_dimension])
 
     self.add_event_listener('mouseup'){@splitter = nil}
     self.add_event_listener('mousemove') do |ev|
@@ -74,10 +87,10 @@ class SplitPanes < CustomElement
       i = @splitter
       d = ev.movement_y
       rect = splitters[i].get_bounding_client_rect
-      next if (d > 0 && ev.y < rect.y) || (d < 0 && ev.y > rect.y + rect.height)
-      h0 = panes[i].client_height + panes[i+1].client_height
-      h1 = panes[i].client_height + d
-      h2 = panes[i+1].client_height - d
+      next if (d > 0 && ev.y < rect.y) || (d < 0 && ev.y > rect.y + rect[@dimension])
+      h0 = panes[i][@client_dimension] + panes[i+1][@client_dimension]
+      h1 = panes[i][@client_dimension] + d
+      h2 = panes[i+1][@client_dimension] - d
       if h1 < 20
         h1 = 20
         h2 = h0 - 20
@@ -86,37 +99,45 @@ class SplitPanes < CustomElement
         h2 = 20
         h1 = h0 - 20
       end
-      panes[i].style.height = "#{h1}px"
-      panes[i+1].style.height = "#{h2}px"
-      reset_pane_position(self.client_height)
+      panes[i].style[@dimension] = "#{h1}px"
+      panes[i+1].style[@dimension] = "#{h2}px"
+      reset_pane_position(self[:@client_dimension])
     end
 
     resize_observer = JSrb.global[:ResizeObserver].new do |entries|
       entries.each do |entry|
-        new_height = entry.border_box_size[0].block_size
-        reset_pane_position(new_height)
+        new_size = entry.border_box_size[0].block_size
+        reset_pane_position(new_size)
       end
       nil
     end
     resize_observer.observe(self.js_object)
   end
 
-  def reset_pane_position(new_height)
-    top = 0
-    width = self.client_width
-    @panes[0..-2].each_with_index do |pane, i|
-      pane.style.top = "#{top}px"
-      pane.style.width = "#{width}px"
-      top += pane.client_height
-      @splitters[i].style.top = "#{top}px"
-      @splitters[i].style.width = "#{width}px"
-      top += @splitters[i].client_height
+  def reset_pane_position(new_size)
+    total = 0
+    if @mode == :vertical
+      another_dimension = :height
+      another_size = self.client_height
+      pos = :left
+    else
+      another_dimension = :width
+      another_size = self.client_width
+      pos = :top
     end
-    @panes.last.style.top = "#{top}px"
-    @panes.last.style.width = "#{width}px"
-    last_pane_height = new_height - top
-    last_pane_height = last_pane_height.clamp(20..)
-    @panes.last.style.height = "#{last_pane_height}px"
+    @panes[0..-2].each_with_index do |pane, i|
+      pane.style[pos] = "#{total}px"
+      pane.style[another_dimension] = "#{another_size}px"
+      total += pane[@client_dimension]
+      @splitters[i].style[pos] = "#{total}px"
+      @splitters[i].style[another_dimension] = "#{another_size}px"
+      total += @splitters[i][@client_dimension]
+    end
+    @panes.last.style[pos] = "#{total}px"
+    @panes.last.style[another_dimension] = "#{another_size}px"
+    last_pane_size = new_size - total
+    last_pane_size = last_pane_size.clamp(20..)
+    @panes.last.style[@dimension] = "#{last_pane_size}px"
   end
 
   def disconnected_callback
@@ -134,7 +155,6 @@ end
 
 class SplitPane < CustomElement
   def connected_callback
-    self.style.width = '100%'
     resize_observer = JSrb.global[:ResizeObserver].new do |entries|
       entries.each do |entry|
         new_height = entry.border_box_size[0].block_size

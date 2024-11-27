@@ -14,7 +14,6 @@ class SplitPanes < CustomElement
         position: absolute;
         display: block;
         align-items: center;
-        cursor: col-resize;
         background-color: white;
         div.knob {
             display: inline-block;
@@ -38,9 +37,11 @@ class SplitPanes < CustomElement
         }
     }
     split-splitter.vertical {
+        cursor: col-resize;
         width: 6px
     }
     split-splitter.horizontal {
+        cursor: row-resize;
         height: 6px
     }
   CSS
@@ -67,6 +68,8 @@ class SplitPanes < CustomElement
 
     @panes = panes
     @splitters = splitters
+
+    reset_pane_position(self.client_width)
 
     self.add_event_listener('mouseup'){@splitter = nil}
     self.add_event_listener('mousemove') do |ev|
