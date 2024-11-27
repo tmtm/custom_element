@@ -14,18 +14,34 @@ class SplitPanes < CustomElement
         position: absolute;
         display: block;
         align-items: center;
-        width: 6px;
         cursor: col-resize;
         background-color: white;
         div.knob {
+            display: inline-block;
             position: absolute;
-            top: 50%;
-            background-color: #ddd;
-            width: 4px;
-            height: 50px;
+            vertical-align: middle;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
             margin: auto;
+            background-color: #ddd;
             user-select: none;
         }
+        div.knob-vertical {
+            width: 4px;
+            height: 50px;
+        }
+        div.knob-horizontal {
+            width: 50px;
+            height: 4px;
+        }
+    }
+    split-splitter.vertical {
+        width: 6px
+    }
+    split-splitter.horizontal {
+        height: 6px
     }
   CSS
   JSrb.document.query_selector('head').append(style)
@@ -35,6 +51,7 @@ class SplitPanes < CustomElement
     splitters = []
     (panes.size - 1).times.each do |i|
       splitter = JSrb.document.create_element('split-splitter')
+      splitter.class_name = 'vertical'
       splitter.add_event_listener('mousedown'){|ev| @splitter = i if ev.buttons == 1}
       splitters.push splitter
       panes[i].after splitter
@@ -146,7 +163,7 @@ end
 class SplitSplitter < CustomElement
   def connected_callback
     knob = JSrb.document.create_element('div')
-    knob.class_name = 'knob'
+    knob.class_name = 'knob knob-vertical'
     self.append knob
   end
 
