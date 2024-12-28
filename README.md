@@ -5,7 +5,7 @@
 ```html
 <!DOCTYPE html>
 <html>
-  <script src="https://cdn.jsdelivr.net/npm/@ruby/3.3-wasm-wasi@2.6.2/dist/browser.script.iife.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@ruby/3.3-wasm-wasi@2.7.0/dist/browser.script.iife.js"></script>
   <script type="text/ruby" src="https://cdn.jsdelivr.net/gh/tmtm/jsrb@v0.1.0/jsrb.rb"></script>
   <script type="text/ruby" src="https://cdn.jsdelivr.net/gh/tmtm/custom_element@v0.0.5/lib/custom_element.rb"></script>
   <script type="text/ruby">
@@ -24,7 +24,7 @@
 </html>
 ```
 
-この例は `<hoge-hoge>` 要素が作られたときに `HogeHoge#initialize` が実行される。
+この例は `<hoge-hoge>` 要素が作られたときに `HogeHoge#connected_callback` が実行される。
 
 ## License
 
