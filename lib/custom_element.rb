@@ -1,6 +1,43 @@
 # base class for creating custom elements
+
+JS.eval <<~JS
+  RubyCustomElement = {
+    objectIdMap: new WeakMap(),
+    objectRubyIdMap: new WeakMap(),
+    idObjectMap: new Map(),
+    attributeChanged: new Map(),
+    objectIdCounter: 0,
+    objectId: function(object) {
+      if (!this.objectIdMap.has(object)) {
+        var id = ++this.objectIdCounter
+        this.objectIdMap.set(object, id)
+        this.idObjectMap.set(id, object)
+      }
+      return this.objectIdMap.get(object)
+    },
+    instanceOf: function(object, klass) {
+      return object instanceof klass
+    },
+  }
+JS
+
+class << JSrb
+  prepend Module.new {
+    def convert(v)
+      x = super
+      if x.kind_of?(JSrb) && JS.global[:RubyCustomElement].instanceOf(x.js_object, JS.global[:HTMLElement])
+        js_object_id = JS.global[:RubyCustomElement].objectId(x.js_object).to_i
+        x = CustomElement.object_map[js_object_id] ||= x
+      end
+      x
+    end
+  }
+end
+
 class CustomElement
-  JS.eval("_ruby_custom_element_id = 0; _ruby_custom_element_this = {}; _attribute_changed = {}")
+  def self.object_map
+    @object_map ||= {}
+  end
 
   def self.define(tag_name, element_class)
     JS.eval("customElements.define('#{tag_name}', #{element_class.name})")
@@ -31,11 +68,10 @@ class CustomElement
         constructor() {
           super()
           if (this.constructor === #{class_name}) {
-            this._ruby_custom_element_id = ++_ruby_custom_element_id
-            _ruby_custom_element_this[this._ruby_custom_element_id] = this
             setTimeout(()=>{
-              this._ruby_object_id = rubyVM.eval('#{subclass.name}.construct('+this._ruby_custom_element_id+').__id__').toJS()
-              delete _ruby_custom_element_this[this._ruby_custom_element_id]
+              var id = RubyCustomElement.objectId(this)
+              RubyCustomElement.objectRubyIdMap.set(this, rubyVM.eval('#{subclass.name}.construct('+id+').__id__').toJS())
+              delete RubyCustomElement.idObjectMap[id]
             }, 0)
           }
         }
@@ -43,19 +79,22 @@ class CustomElement
           return rubyVM.eval('#{subclass.name}.observed_attributes').toJS()
         }
         connectedCallback() {
-          setTimeout(()=>{rubyVM.eval('ObjectSpace._id2ref('+this._ruby_object_id+').connected_callback')}, 0)
+          setTimeout(()=>{rubyVM.eval('ObjectSpace._id2ref('+RubyCustomElement.objectRubyIdMap.get(this)+').connected_callback')}, 0)
         }
         disconnectedCallback() {
-          setTimeout(()=>{rubyVM.eval('ObjectSpace._id2ref('+this._ruby_object_id+').disconnected_callback')}, 0)
+          setTimeout(()=>{rubyVM.eval('ObjectSpace._id2ref('+RubyCustomElement.objectRubyIdMap.get(this)+').disconnected_callback')}, 0)
         }
         adoptedCallback() {
-          setTimeout(()=>{rubyVM.eval('ObjectSpace._id2ref('+this._ruby_object_id+').adopted_callback')}, 0)
+          setTimeout(()=>{rubyVM.eval('ObjectSpace._id2ref('+RubyCustomElement.objectRubyIdMap.get(this)+').adopted_callback')}, 0)
         }
         attributeChangedCallback(name, oldValue, newValue) {
           var intervalID = setInterval(()=>{
-            if (this._ruby_object_id) {
-              _attribute_changed[this._ruby_object_id] = {name, oldValue, newValue}
-              setTimeout(()=>{rubyVM.eval('x=ObjectSpace._id2ref('+this._ruby_object_id+');x.attribute_changed_callback(*JSrb.global[:_attribute_changed].to_h[x.__id__.to_s].to_h.values_at("name", "oldValue", "newValue"))')}, 0)
+            if (RubyCustomElement.objectRubyIdMap.get(this)) {
+              var rubyObjectId = RubyCustomElement.objectRubyIdMap.get(this)
+              RubyCustomElement.attributeChanged.set(rubyObjectId, {name, oldValue, newValue})
+              setTimeout(()=>{
+                rubyVM.eval('CustomElement.attribute_changed_callback('+RubyCustomElement.objectRubyIdMap.get(this)+')')
+              }, 0)
               clearInterval(intervalID)
             }
           }, 100)
@@ -68,16 +107,18 @@ class CustomElement
     raise
   end
 
-  def self.object
-    @object ||= {}
-  end
-
   def self.construct(id)
     obj = self.allocate
-    obj.instance_variable_set(:@this, JSrb.global[:_ruby_custom_element_this][id])
-    object[id] = obj
+    obj.instance_variable_set(:@this, JSrb.global[:RubyCustomElement][:idObjectMap].get(id))
+    object_map[id] = obj
     obj.__send__ :initialize
     obj
+  end
+
+  def self.attribute_changed_callback(id)
+    x = ObjectSpace._id2ref(id)
+    name, old_value, new_value = *JSrb.global[:RubyCustomElement][:attributeChanged].get(x.__id__).to_h.values_at("name", "oldValue", "newValue")
+    x.attribute_changed_callback(name, old_value, new_value)
   end
 
   def connected_callback

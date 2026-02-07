@@ -85,9 +85,15 @@ class SplitPanes < CustomElement
     self.add_event_listener('mousemove') do |ev|
       next if !@splitter || ev.buttons != 1
       i = @splitter
-      d = ev.movement_y
-      rect = splitters[i].get_bounding_client_rect
-      next if (d > 0 && ev.y < rect.y) || (d < 0 && ev.y > rect.y + rect[@dimension])
+      if @mode == :horizontal
+        d = ev.movement_y
+        rect = splitters[i].get_bounding_client_rect
+        next if (d > 0 && ev.y < rect.y) || (d < 0 && ev.y > rect.y + rect[@dimension])
+      else
+        d = ev.movement_x
+        rect = splitters[i].get_bounding_client_rect
+        next if (d > 0 && ev.x < rect.x) || (d < 0 && ev.x > rect.x + rect[@dimension])
+      end
       h0 = panes[i][@client_dimension] + panes[i+1][@client_dimension]
       h1 = panes[i][@client_dimension] + d
       h2 = panes[i+1][@client_dimension] - d
@@ -184,7 +190,7 @@ end
 class SplitSplitter < CustomElement
   def connected_callback
     knob = JSrb.document.create_element('div')
-    knob.class_name = 'knob knob-horizontal'
+    knob.class_name = "knob knob-#{self.class_name}"
     self.append knob
   end
 
