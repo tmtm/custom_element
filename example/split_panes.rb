@@ -2,6 +2,7 @@ class SplitPanes < CustomElement
   style = JSrb.document.create_element('style')
   style.text_content = <<~CSS
     split-panes {
+        position: absolute;
         display: block;
         overflow: scroll;
     }
