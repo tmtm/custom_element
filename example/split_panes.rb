@@ -113,7 +113,8 @@ class SplitPanes < CustomElement
 
     resize_observer = JSrb.global[:ResizeObserver].new do |entries|
       entries.each do |entry|
-        new_size = entry.border_box_size[0].block_size
+        box_size = entry.border_box_size[0]
+        new_size = @dimension == :width ? box_size.inline_size : box_size.block_size
         reset_pane_position(new_size)
       end
       nil
