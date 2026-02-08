@@ -107,7 +107,7 @@ class SplitPanes < CustomElement
       end
       panes[i].style[@dimension] = "#{h1}px"
       panes[i+1].style[@dimension] = "#{h2}px"
-      reset_pane_position(self[:@client_dimension])
+      reset_pane_position(self[@client_dimension])
     end
 
     resize_observer = JSrb.global[:ResizeObserver].new do |entries|
