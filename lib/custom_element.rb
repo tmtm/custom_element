@@ -40,7 +40,7 @@ class CustomElement
   end
 
   def self.define(tag_name, element_class)
-    JS.eval("customElements.define('#{tag_name}', #{element_class.name})")
+    JS.eval("customElements.define('#{tag_name}', #{element_class.name.gsub(/::/, '__')})")
   end
 
   def self.observed_attributes=(attrs)
