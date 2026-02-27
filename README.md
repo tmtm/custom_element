@@ -5,7 +5,7 @@
 ```html
 <!DOCTYPE html>
 <html>
-  <script src="https://cdn.jsdelivr.net/npm/@ruby/3.3-wasm-wasi@2.7.0/dist/browser.script.iife.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@ruby/4.0-wasm-wasi@2.8.1/dist/browser.script.iife.js"></script>
   <script type="text/ruby" src="https://cdn.jsdelivr.net/gh/tmtm/jsrb@v0.1.0/jsrb.rb"></script>
   <script type="text/ruby" src="https://cdn.jsdelivr.net/gh/tmtm/custom_element@v0.0.5/lib/custom_element.rb"></script>
   <script type="text/ruby">

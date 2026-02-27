@@ -1,65 +1,60 @@
 class SplitPanes < CustomElement
   style = JSrb.document.create_element('style')
   style.text_content = <<~CSS
+    @property --grid-template-columns {
+      syntax: "*";
+      inherits: false;
+    }
+    @property --grid-template-rows {
+      syntax: "*";
+      inherits: false;
+    }
     split-panes {
-        position: absolute;
-        display: block;
+        display: grid;
         overflow: scroll;
+        grid-template-columns: var(--grid-template-columns);
+        grid-template-rows: var(--grid-template-rows);
     }
     split-pane {
-        position: absolute;
-        display: block;
         overflow: scroll;
     }
     split-splitter {
-        position: absolute;
-        display: block;
+        display: flex;
         align-items: center;
-        background-color: white;
+        user-select: none;
         div.knob {
-            display: inline-block;
-            position: absolute;
-            vertical-align: middle;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            left: 0;
-            margin: auto;
-            background-color: #ddd;
             user-select: none;
-        }
-        div.knob-vertical {
-            width: 4px;
-            height: 50px;
-        }
-        div.knob-horizontal {
-            width: 50px;
-            height: 4px;
+            z-index: 10;
         }
     }
     split-splitter.vertical {
         cursor: col-resize;
-        width: 6px
     }
     split-splitter.horizontal {
         cursor: row-resize;
-        height: 6px
     }
   CSS
   JSrb.document.query_selector('head').append(style)
 
   def connected_callback
+    panes = self.query_selector_all(':scope > split-pane').entries
+
     if self.get_attribute('vertical')
       @mode = :vertical
       @dimension = :width
       @client_dimension = :clientWidth
+      grid_css_param = '--grid-template-columns'
     else
       @mode = :horizontal
       @dimension = :height
       @client_dimension = :clientHeight
+      grid_css_param = '--grid-template-rows'
     end
 
-    panes = self.query_selector_all(':scope > split-pane').entries
+    if JSrb.window.get_computed_style(self.js_object).get_property_value(grid_css_param).empty?
+      style.set_property(grid_css_param, panes.size.times.map{'1fr'}.join(' 8px '))
+    end
+
     splitters = []
     (panes.size - 1).times.each do |i|
       splitter = JSrb.document.create_element('split-splitter')
@@ -68,19 +63,9 @@ class SplitPanes < CustomElement
       splitters.push splitter
       panes[i].after splitter
     end
-    splitter_size = splitters.sum(&@client_dimension)
-    self.style[:"min#{@dimension.upcase}"] = "#{(panes.size * 20) + splitter_size}px" unless self.style[:"min#{@dimension.upcase}"]
-    panes_size = self[@client_dimension] - splitter_size
-    size = panes_size / panes.size
-    panes[0..-2].each do |pane|
-      pane.style[@dimension] = "#{size}px"
-    end
-    panes.last.style[@dimension] = "#{panes_size - (size * (panes.size - 1))}px"
 
     @panes = panes
     @splitters = splitters
-
-    reset_pane_position(self[@client_dimension])
 
     self.add_event_listener('mouseup'){@splitter = nil}
     self.add_event_listener('mousemove') do |ev|
@@ -90,32 +75,36 @@ class SplitPanes < CustomElement
         d = ev.movement_y
         rect = splitters[i].get_bounding_client_rect
         next if (d > 0 && ev.y < rect.y) || (d < 0 && ev.y > rect.y + rect[@dimension])
+        grid_param = :gridTemplateRows
       else
         d = ev.movement_x
         rect = splitters[i].get_bounding_client_rect
         next if (d > 0 && ev.x < rect.x) || (d < 0 && ev.x > rect.x + rect[@dimension])
+        grid_param = :gridTemplateColumns
       end
-      h0 = panes[i][@client_dimension] + panes[i+1][@client_dimension]
-      h1 = panes[i][@client_dimension] + d
-      h2 = panes[i+1][@client_dimension] - d
-      if h1 < 20
-        h1 = 20
-        h2 = h0 - 20
+      grid_sizes = JSrb.window.get_computed_style(self.js_object)[grid_param].split.map(&:to_f)
+      pane_sizes = grid_sizes.select.with_index{|_,i| i.even?}
+      splitter_sizes = grid_sizes.select.with_index{|_,i| i.odd?}
+      pane_size_total = pane_sizes[i] + pane_sizes[i+1]
+      pane_sizes[i] += d
+      pane_sizes[i+1] -= d
+      min1 = JSrb.window.get_computed_style(panes[i]).min_width.to_f
+      min2 = JSrb.window.get_computed_style(panes[i+1]).min_width.to_f
+      if pane_sizes[i] < min1
+        pane_sizes[i] = min1
+        pane_sizes[i+1] = pane_size_total - pane_sizes[i]
+      elsif pane_sizes[i+1] < min2
+        pane_sizes[i+1] = min2
+        pane_sizes[i] = pane_size_total - pane_sizes[i+1]
       end
-      if h2 < 20
-        h2 = 20
-        h1 = h0 - 20
-      end
-      panes[i].style[@dimension] = "#{h1}px"
-      panes[i+1].style[@dimension] = "#{h2}px"
-      reset_pane_position(self[@client_dimension])
+      style[grid_param] = pane_sizes.zip(splitter_sizes).flatten.compact.map{"#{it}px"}.join(' ')
     end
 
     resize_observer = JSrb.global[:ResizeObserver].new do |entries|
       entries.each do |entry|
         box_size = entry.border_box_size[0]
         new_size = @dimension == :width ? box_size.inline_size : box_size.block_size
-        reset_pane_position(new_size)
+        # reset_pane_position(new_size)
       end
       nil
     end

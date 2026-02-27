@@ -141,7 +141,7 @@ class CustomElement
     @this.__send__(...)
   end
 
-  def respond_to_missing?(name)
+  def respond_to_missing?(name, include_private)
     !!@this[name]
   end
 end
