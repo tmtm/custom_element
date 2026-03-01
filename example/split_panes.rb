@@ -43,11 +43,13 @@ class SplitPanes < CustomElement
       @mode = :vertical
       @dimension = :width
       @client_dimension = :clientWidth
+      @min_size = :minWidth
       grid_css_param = '--grid-template-columns'
     else
       @mode = :horizontal
       @dimension = :height
       @client_dimension = :clientHeight
+      @min_size = :minHeight
       grid_css_param = '--grid-template-rows'
     end
 
@@ -59,7 +61,12 @@ class SplitPanes < CustomElement
     (panes.size - 1).times.each do |i|
       splitter = JSrb.document.create_element('split-splitter')
       splitter.class_name = @mode.to_s
-      splitter.add_event_listener('mousedown'){|ev| @splitter = i if ev.buttons == 1}
+      splitter.add_event_listener('mousedown'){|ev|
+        if ev.buttons == 1
+          @splitter = i
+          @x, @y = ev.client_x, ev.client_y
+        end
+      }
       splitters.push splitter
       panes[i].after splitter
     end
@@ -71,14 +78,16 @@ class SplitPanes < CustomElement
     self.add_event_listener('mousemove') do |ev|
       next if !@splitter || ev.buttons != 1
       i = @splitter
+      rect = splitters[i].get_bounding_client_rect
+      dx = ev.client_x - @x
+      dy = ev.client_y - @y
+      @x, @y = ev.client_x, ev.client_y
       if @mode == :horizontal
-        d = ev.movement_y
-        rect = splitters[i].get_bounding_client_rect
+        d = dy
         next if (d > 0 && ev.y < rect.y) || (d < 0 && ev.y > rect.y + rect[@dimension])
         grid_param = :gridTemplateRows
       else
-        d = ev.movement_x
-        rect = splitters[i].get_bounding_client_rect
+        d = dx
         next if (d > 0 && ev.x < rect.x) || (d < 0 && ev.x > rect.x + rect[@dimension])
         grid_param = :gridTemplateColumns
       end
@@ -88,8 +97,8 @@ class SplitPanes < CustomElement
       pane_size_total = pane_sizes[i] + pane_sizes[i+1]
       pane_sizes[i] += d
       pane_sizes[i+1] -= d
-      min1 = JSrb.window.get_computed_style(panes[i]).min_width.to_f
-      min2 = JSrb.window.get_computed_style(panes[i+1]).min_width.to_f
+      min1 = JSrb.window.get_computed_style(panes[i])[@min_size].to_f
+      min2 = JSrb.window.get_computed_style(panes[i+1])[@min_size].to_f
       if pane_sizes[i] < min1
         pane_sizes[i] = min1
         pane_sizes[i+1] = pane_size_total - pane_sizes[i]
@@ -104,37 +113,10 @@ class SplitPanes < CustomElement
       entries.each do |entry|
         box_size = entry.border_box_size[0]
         new_size = @dimension == :width ? box_size.inline_size : box_size.block_size
-        # reset_pane_position(new_size)
       end
       nil
     end
     resize_observer.observe(self.js_object)
-  end
-
-  def reset_pane_position(new_size)
-    total = 0
-    if @mode == :vertical
-      another_dimension = :height
-      another_size = self.client_height
-      pos = :left
-    else
-      another_dimension = :width
-      another_size = self.client_width
-      pos = :top
-    end
-    @panes[0..-2].each_with_index do |pane, i|
-      pane.style[pos] = "#{total}px"
-      pane.style[another_dimension] = "#{another_size}px"
-      total += pane[@client_dimension]
-      @splitters[i].style[pos] = "#{total}px"
-      @splitters[i].style[another_dimension] = "#{another_size}px"
-      total += @splitters[i][@client_dimension]
-    end
-    @panes.last.style[pos] = "#{total}px"
-    @panes.last.style[another_dimension] = "#{another_size}px"
-    last_pane_size = new_size - total
-    last_pane_size = last_pane_size.clamp(20..)
-    @panes.last.style[@dimension] = "#{last_pane_size}px"
   end
 
   def disconnected_callback
