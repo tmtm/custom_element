@@ -44,12 +44,14 @@ class SplitPanes < CustomElement
       @dimension = :width
       @client_dimension = :clientWidth
       @min_size = :minWidth
+      @grid_param = :gridTemplateColumns
       grid_css_param = '--grid-template-columns'
     else
       @mode = :horizontal
       @dimension = :height
       @client_dimension = :clientHeight
       @min_size = :minHeight
+      @grid_param = :gridTemplateRows
       grid_css_param = '--grid-template-rows'
     end
 
@@ -70,6 +72,10 @@ class SplitPanes < CustomElement
       splitters.push splitter
       panes[i].after splitter
     end
+    JSrb.timeout(0){
+      grid_sizes = JSrb.window.get_computed_style(self.js_object)[@grid_param].split.map(&:to_f)
+      style[@grid_param] = grid_sizes.map{"#{it}px"}.join(' ')
+    }
 
     @panes = panes
     @splitters = splitters
@@ -85,13 +91,11 @@ class SplitPanes < CustomElement
       if @mode == :horizontal
         d = dy
         next if (d > 0 && ev.y < rect.y) || (d < 0 && ev.y > rect.y + rect[@dimension])
-        grid_param = :gridTemplateRows
       else
         d = dx
         next if (d > 0 && ev.x < rect.x) || (d < 0 && ev.x > rect.x + rect[@dimension])
-        grid_param = :gridTemplateColumns
       end
-      grid_sizes = JSrb.window.get_computed_style(self.js_object)[grid_param].split.map(&:to_f)
+      grid_sizes = JSrb.window.get_computed_style(self.js_object)[@grid_param].split.map(&:to_f)
       pane_sizes = grid_sizes.select.with_index{|_,i| i.even?}
       splitter_sizes = grid_sizes.select.with_index{|_,i| i.odd?}
       pane_size_total = pane_sizes[i] + pane_sizes[i+1]
@@ -106,13 +110,24 @@ class SplitPanes < CustomElement
         pane_sizes[i+1] = min2
         pane_sizes[i] = pane_size_total - pane_sizes[i+1]
       end
-      style[grid_param] = pane_sizes.zip(splitter_sizes).flatten.compact.map{"#{it}px"}.join(' ')
+      style[@grid_param] = pane_sizes.zip(splitter_sizes).flatten.compact.map{"#{it}px"}.join(' ')
     end
 
     resize_observer = JSrb.global[:ResizeObserver].new do |entries|
       entries.each do |entry|
         box_size = entry.border_box_size[0]
         new_size = @dimension == :width ? box_size.inline_size : box_size.block_size
+
+        grid_sizes = JSrb.window.get_computed_style(self.js_object)[@grid_param].split.map(&:to_f)
+        pane_sizes = grid_sizes.select.with_index{|_,i| i.even?}
+        splitter_sizes = grid_sizes.select.with_index{|_,i| i.odd?}
+        pane_size_total = grid_sizes.sum
+        d = new_size - pane_size_total
+
+        pane_sizes[-1] += d
+        min = JSrb.window.get_computed_style(panes.last)[@min_size].to_f
+        pane_sizes[-1] = min if pane_sizes[-1] < min
+        style[@grid_param] = pane_sizes.zip(splitter_sizes).flatten.compact.map{"#{it}px"}.join(' ')
       end
       nil
     end
