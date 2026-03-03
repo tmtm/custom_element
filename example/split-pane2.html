@@ -1,5 +1,21 @@
 <!DOCTYPE html>
 <html>
+  <style>
+    split-splitter {
+      .knob-vertical {
+        margin: auto -1px !important;
+        border: solid 2px;
+        width: 6px;
+        height: 50px;
+      }
+      .knob-horizontal {
+        margin: -1px auto !important;
+        border: solid 2px;
+        width: 50px;
+        height: 6px;
+      }
+    }
+  </style>
   <script src="https://cdn.jsdelivr.net/npm/@ruby/4.0-wasm-wasi@2.8.1/dist/browser.script.iife.js"></script>
   <script type="text/ruby" src="https://cdn.jsdelivr.net/gh/tmtm/jsrb@v0.1.0/jsrb.rb"></script>
   <script type="text/ruby" src="../lib/custom_element.rb"></script>

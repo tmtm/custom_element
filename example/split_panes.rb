@@ -23,6 +23,7 @@ class SplitPanes < CustomElement
         align-items: center;
         user-select: none;
         div.knob {
+            margin: auto;
             user-select: none;
             z-index: 10;
         }
@@ -72,9 +73,10 @@ class SplitPanes < CustomElement
       splitters.push splitter
       panes[i].after splitter
     end
-    JSrb.timeout(0){
+    JSrb.timeout(0.1){
       grid_sizes = JSrb.window.get_computed_style(self.js_object)[@grid_param].split.map(&:to_f)
       style[@grid_param] = grid_sizes.map{"#{it}px"}.join(' ')
+      @ready = true
     }
 
     @panes = panes
@@ -114,6 +116,7 @@ class SplitPanes < CustomElement
     end
 
     resize_observer = JSrb.global[:ResizeObserver].new do |entries|
+      next unless @ready
       entries.each do |entry|
         box_size = entry.border_box_size[0]
         new_size = @dimension == :width ? box_size.inline_size : box_size.block_size
