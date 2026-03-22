@@ -68,6 +68,9 @@ class SplitPanes < CustomElement
         if ev.buttons == 1
           @splitter = i
           @x, @y = ev.client_x, ev.client_y
+          @overlay = JSrb.document.create_element('div')
+          @overlay.style = 'position:absolute;inset:0;background:rgba(0,0,0,0);'
+          self.append @overlay
         end
       }
       splitters.push splitter
@@ -82,7 +85,10 @@ class SplitPanes < CustomElement
     @panes = panes
     @splitters = splitters
 
-    self.add_event_listener('mouseup'){@splitter = nil}
+    self.add_event_listener('mouseup') do
+      @splitter = nil
+      @overlay&.remove
+    end
     self.add_event_listener('mousemove') do |ev|
       next if !@splitter || ev.buttons != 1
       i = @splitter
@@ -154,8 +160,8 @@ class SplitPane < CustomElement
   def connected_callback
     resize_observer = JSrb.global[:ResizeObserver].new do |entries|
       entries.each do |entry|
-        new_height = entry.border_box_size[0].block_size
-        if self.children.first
+        if self.children.size == 1
+          new_height = entry.border_box_size[0].block_size
           self.children.first.style.width = '100%'
           self.children.first.style.height = "#{new_height}px"
         end
